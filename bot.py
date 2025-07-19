@@ -8,6 +8,14 @@ import telebot
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
+# Мысалы үшін команда
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bot.send_message(message.chat.id, "Сәлем! Бұл такси боты.")
+
+bot.polling(none_stop=True)
+
+
 # Жаңа authentication әдісі
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
