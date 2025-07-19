@@ -1,4 +1,3 @@
-
 import telebot
 from telebot import types
 import gspread
@@ -105,17 +104,11 @@ def handle_time(msg):
 
     info = user_data[cid]
     order_text = (
-        "🚕 Жаңа тапсырыс!
-
-"
-        f"Аты: {info['name']}
-"
-        f"Телефон: {info['phone']}
-"
-        f"Алып кету: {info['from']}
-"
-        f"Бару: {info['to']}
-"
+        "🚕 Жаңа тапсырыс!\n\n"
+        f"Аты: {info['name']}\n"
+        f"Телефон: {info['phone']}\n"
+        f"Алып кету: {info['from']}\n"
+        f"Бару: {info['to']}\n"
         f"Уақыты: {info['time']}"
     )
 
@@ -162,30 +155,19 @@ def handle_callbacks(call):
             ])
 
             bot.send_message(order_id, (
-                f"✅ Жүргізуші табылды!
-
-"
-                f"Аты-жөні: {driver_info['name']}
-"
-                f"Тел: {driver_info['phone']}
-"
-                f"Көлік: {driver_info['car']}
-"
+                f"✅ Жүргізуші табылды!\n\n"
+                f"Аты-жөні: {driver_info['name']}\n"
+                f"Тел: {driver_info['phone']}\n"
+                f"Көлік: {driver_info['car']}\n"
                 f"Нөмірі: {driver_info['number']}"
             ), reply_markup=main_menu_keyboard())
 
             bot.send_message(driver_id, (
-                f"🚖 Сіз клиентті алдыңыз!
-
-"
-                f"Аты: {client_info['name']}
-"
-                f"Тел: {client_info['phone']}
-"
-                f"Алып кету: {client_info['from']}
-"
-                f"Бару: {client_info['to']}
-"
+                f"🚖 Сіз клиентті алдыңыз!\n\n"
+                f"Аты: {client_info['name']}\n"
+                f"Тел: {client_info['phone']}\n"
+                f"Алып кету: {client_info['from']}\n"
+                f"Бару: {client_info['to']}\n"
                 f"Уақыты: {client_info['time']}"
             ))
 
@@ -204,77 +186,4 @@ def driver_register(msg):
     cid = msg.chat.id
     user_data[cid] = {}
     user_state[cid] = "reg_name"
-    bot.send_message(cid, "Атыңызды жазыңыз:", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, ask_driver_phone)
-
-def ask_driver_phone(msg):
-    cid = msg.chat.id
-    if msg.text == "📞 Қолдау қызметі":
-        return support(msg)
-    if user_state.get(cid) != "reg_name":
-        return start(msg)
-    user_data[cid]['name'] = msg.text
-    user_state[cid] = "reg_phone"
-    bot.send_message(cid, "Телефон нөміріңіз:", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, ask_driver_number)
-
-def ask_driver_number(msg):
-    cid = msg.chat.id
-    if msg.text == "📞 Қолдау қызметі":
-        return support(msg)
-    if user_state.get(cid) != "reg_phone":
-        return start(msg)
-    user_data[cid]['phone'] = msg.text
-    user_state[cid] = "reg_number"
-    bot.send_message(cid, "Көлік номеріңіз:", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, ask_driver_car)
-
-def ask_driver_car(msg):
-    cid = msg.chat.id
-    if msg.text == "📞 Қолдау қызметі":
-        return support(msg)
-    if user_state.get(cid) != "reg_number":
-        return start(msg)
-    user_data[cid]['number'] = msg.text
-    user_state[cid] = "reg_car"
-    bot.send_message(cid, "Көлік маркасы:", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, finish_driver_registration)
-
-def finish_driver_registration(msg):
-    cid = msg.chat.id
-    if msg.text == "📞 Қолдау қызметі":
-        return support(msg)
-    if user_state.get(cid) != "reg_car":
-        return start(msg)
-    user_data[cid]['car'] = msg.text
-    user_state[cid] = None
-
-    data = user_data[cid]
-    drivers_ws.append_row([
-        str(cid),
-        data['name'],
-        data['phone'],
-        data['number'],
-        data['car']
-    ])
-
-    bot.send_message(cid,
-        "🎉 Сіз жүргізуші ретінде тіркелдіңіз!
-"
-        "Енді @kasymbekoffnr аккаунтына жазыңыз — сізді топқа қосу үшін.",
-        reply_markup=main_menu_keyboard()
-    )
-
-def get_driver_by_id(tid):
-    all_data = drivers_ws.get_all_records()
-    for row in all_data:
-        if str(row["Telegram ID"]) == str(tid):
-            return {
-                "name": row["Аты-жөні"],
-                "phone": row["Телефон"],
-                "number": row["Көлік номері"],
-                "car": row["Көлік маркасы"]
-            }
-    return None
-
-bot.infinity_polling()
+    bot.send_me_
