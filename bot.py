@@ -2,8 +2,10 @@ import os
 from telebot import types
 import gspread
 from google.oauth2.service_account import Credentials
-from config import *
+import os
+import telebot
 
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # Жаңа authentication әдісі
