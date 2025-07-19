@@ -230,6 +230,7 @@ def finish_driver_registration(msg):
         return support(msg)
     if user_state.get(cid) != "reg_car":
         return start(msg)
+    
     user_data[cid]['car'] = msg.text
     user_state[cid] = None
 
@@ -241,6 +242,13 @@ def finish_driver_registration(msg):
         data['number'],
         data['car']
     ])
+
+    bot.send_message(cid,
+        "🎉 Сіз жүргізуші ретінде тіркелдіңіз!\n"
+        "Енді @kasymbekoffnr аккаунтына жазыңыз — сізді топқа қосу үшін.",
+        reply_markup=main_menu_keyboard()
+    )
+
 
     bot.send_message(cid,
         "🎉 Сіз жүргізуші ретінде тіркелдіңіз!\n"
