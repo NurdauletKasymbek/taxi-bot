@@ -1,28 +1,13 @@
-import os
+import telebot
 from telebot import types
 import gspread
-from google.oauth2.service_account import Credentials
-import os
-import telebot
+from oauth2client.service_account import ServiceAccountCredentials
+from config import *
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Мысалы үшін команда
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    bot.send_message(message.chat.id, "Сәлем! Бұл такси боты.")
-
-bot.polling(none_stop=True)
-
-
-# Жаңа authentication әдісі
-scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-
-creds = Credentials.from_service_account_file("creds.json", scopes=scope)
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
 client = gspread.authorize(creds)
 sheet = client.open_by_key(SHEET_ID)
 drivers_ws = sheet.worksheet(DRIVERS_SHEET)
@@ -201,6 +186,4 @@ def get_driver_by_id(tid):
             }
     return None
 
-if __name__ == "__main__":
-    print("Бот іске қосылды...")
-    bot.infinity_polling()
+bot.infinity_polling()
