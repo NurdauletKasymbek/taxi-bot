@@ -6,14 +6,7 @@ from config import *
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# 🧩 Тұрақты клавиатура
-def main_menu_keyboard():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.row("Такси шақыру", "Серіктес болу")
-    markup.add("📞 Қолдау қызметі")
-    return markup
-
-# 📊 Google Sheets орнату
+# Google Sheets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("/etc/secrets/creds.json", scope)
 client = gspread.authorize(creds)
@@ -21,44 +14,77 @@ sheet = client.open_by_key(SHEET_ID)
 drivers_ws = sheet.worksheet(DRIVERS_SHEET)
 requests_ws = sheet.worksheet(REQUESTS_SHEET)
 
+# Статустар мен уақытша деректер
+user_state = {}
 user_data = {}
 pending_requests = {}
 
-# 🔘 Start командасы
+# Тұрақты клавиатура
+def main_menu_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row("Такси шақыру", "Серіктес болу")
+    markup.add("📞 Қолдау қызметі")
+    return markup
+
 @bot.message_handler(commands=['start'])
 def start(msg):
-    bot.send_message(msg.chat.id, "Қош келдіңіз! Қызмет түрін таңдаңыз:", reply_markup=main_menu_keyboard())
+    cid = msg.chat.id
+    user_state[cid] = None
+    bot.send_message(cid, "Қош келдіңіз! Қызмет түрін таңдаңыз:", reply_markup=main_menu_keyboard())
 
-# 🚕 Такси шақыру
-@bot.message_handler(func=lambda m: m.text == "Такси шақыру")
-def taxi_request(msg):
-    user_data[msg.chat.id] = {}
-    bot.send_message(msg.chat.id, "Атыңызды енгізіңіз:", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, ask_phone)
+# 📦 Тапсырыс қабылдау
+@bot.message_handler(func=lambda msg: msg.text == "Такси шақыру")
+def handle_taxi_start(msg):
+    cid = msg.chat.id
+    user_data[cid] = {}
+    user_state[cid] = "waiting_name"
+    bot.send_message(cid, "Атыңызды енгізіңіз:", reply_markup=main_menu_keyboard())
+    bot.register_next_step_handler(msg, handle_name)
 
-def ask_phone(msg):
-    user_data[msg.chat.id]['name'] = msg.text
-    bot.send_message(msg.chat.id, "Телефон нөміріңіз:", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, ask_from)
+def handle_name(msg):
+    cid = msg.chat.id
+    if user_state.get(cid) != "waiting_name":
+        return start(msg)
+    user_data[cid]['name'] = msg.text
+    user_state[cid] = "waiting_phone"
+    bot.send_message(cid, "Телефон нөміріңіз:", reply_markup=main_menu_keyboard())
+    bot.register_next_step_handler(msg, handle_phone)
 
-def ask_from(msg):
-    user_data[msg.chat.id]['phone'] = msg.text
-    bot.send_message(msg.chat.id, "Қай жерден алып кету керек?", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, ask_to)
+def handle_phone(msg):
+    cid = msg.chat.id
+    if user_state.get(cid) != "waiting_phone":
+        return start(msg)
+    user_data[cid]['phone'] = msg.text
+    user_state[cid] = "waiting_from"
+    bot.send_message(cid, "Қай жерден алып кету керек?", reply_markup=main_menu_keyboard())
+    bot.register_next_step_handler(msg, handle_from)
 
-def ask_to(msg):
-    user_data[msg.chat.id]['from'] = msg.text
-    bot.send_message(msg.chat.id, "Қайда барасыз?", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, ask_time)
+def handle_from(msg):
+    cid = msg.chat.id
+    if user_state.get(cid) != "waiting_from":
+        return start(msg)
+    user_data[cid]['from'] = msg.text
+    user_state[cid] = "waiting_to"
+    bot.send_message(cid, "Қайда барасыз?", reply_markup=main_menu_keyboard())
+    bot.register_next_step_handler(msg, handle_to)
 
-def ask_time(msg):
-    user_data[msg.chat.id]['to'] = msg.text
-    bot.send_message(msg.chat.id, "Қай уақытта (мысалы: 17:00 17.07.2025):", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, confirm_order)
+def handle_to(msg):
+    cid = msg.chat.id
+    if user_state.get(cid) != "waiting_to":
+        return start(msg)
+    user_data[cid]['to'] = msg.text
+    user_state[cid] = "waiting_time"
+    bot.send_message(cid, "Қай уақытта (мысалы: 18:00 22.07.2025):", reply_markup=main_menu_keyboard())
+    bot.register_next_step_handler(msg, handle_time)
 
-def confirm_order(msg):
-    user_data[msg.chat.id]['time'] = msg.text
-    order_id = msg.chat.id
+def handle_time(msg):
+    cid = msg.chat.id
+    if user_state.get(cid) != "waiting_time":
+        return start(msg)
+    user_data[cid]['time'] = msg.text
+    user_state[cid] = None
+
+    order_id = cid
     pending_requests[order_id] = {"accepted": False}
 
     markup = types.InlineKeyboardMarkup()
@@ -67,49 +93,33 @@ def confirm_order(msg):
         types.InlineKeyboardButton("Қабылдамаймын", callback_data="ignore")
     )
 
+    info = user_data[cid]
     order_text = (
         "🚕 Жаңа тапсырыс!\n\n"
-        f"Аты: {user_data[order_id]['name']}\n"
-        f"Телефон: {user_data[order_id]['phone']}\n"
-        f"Алып кету: {user_data[order_id]['from']}\n"
-        f"Баратын жері: {user_data[order_id]['to']}\n"
-        f"Уақыты: {user_data[order_id]['time']}"
+        f"Аты: {info['name']}\n"
+        f"Телефон: {info['phone']}\n"
+        f"Алып кету: {info['from']}\n"
+        f"Бару: {info['to']}\n"
+        f"Уақыты: {info['time']}"
     )
 
-    msg_sent = bot.send_message(DRIVER_GROUP_ID, order_text, reply_markup=markup)
-    pending_requests[order_id]["message_id"] = msg_sent.message_id
+    sent = bot.send_message(DRIVER_GROUP_ID, order_text, reply_markup=markup)
+    pending_requests[order_id]["message_id"] = sent.message_id
 
-    bot.send_message(order_id, "🚗 Жүргізуші іздестірілуде...", reply_markup=main_menu_keyboard())
+    bot.send_message(cid, "🚗 Жүргізуші іздестірілуде...", reply_markup=main_menu_keyboard())
 
-# ❌ Бас тарту хэндлері
-@bot.message_handler(func=lambda m: "бас тарту" in m.text.lower())
-def cancel_order(msg):
-    user_data.pop(msg.chat.id, None)
-    bot.send_message(msg.chat.id, "❌ Тапсырысыңыз жойылды.", reply_markup=main_menu_keyboard())
-
-# 📞 Қолдау қызметі батырмасы
-@bot.message_handler(func=lambda m: m.text == "📞 Қолдау қызметі")
-def support_handler(msg):
-    bot.send_message(
-        msg.chat.id,
-        "📞 Қолдау қызметі: @kasymbekoffnr\nКез келген сұрақтар бойынша осы аккаунтқа хабарласыңыз.",
-        reply_markup=main_menu_keyboard()
-    )
-
-# ✅ Жүргізушінің қабылдауы
+# 🛑 Callback — жүргізуші қабылдайды
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
     if call.data.startswith("accept_"):
         order_id = int(call.data.split("_")[1])
         if pending_requests.get(order_id, {}).get("accepted"):
-            bot.answer_callback_query(call.id, "Бұл тапсырыс қабылданған.")
-            return
+            return bot.answer_callback_query(call.id, "Бұл тапсырыс қабылданған.")
 
         driver_id = call.from_user.id
         driver_info = get_driver_by_id(driver_id)
         if not driver_info:
-            bot.answer_callback_query(call.id, "Сіз тіркелмегенсіз.")
-            return
+            return bot.answer_callback_query(call.id, "Сіз тіркелмегенсіз.")
 
         pending_requests[order_id]["accepted"] = True
         pending_requests[order_id]["driver_id"] = driver_id
@@ -129,70 +139,97 @@ def handle_callbacks(call):
                 driver_info['car']
             ])
 
-        # Клиентке жүргізуші дерегі
-        bot.send_message(order_id, (
-            f"✅ Жүргізуші табылды!\n\n"
-            f"Аты-жөні: {driver_info['name']}\n"
-            f"Тел: {driver_info['phone']}\n"
-            f"Көлік: {driver_info['car']}\n"
-            f"Нөмірі: {driver_info['number']}"
-        ), reply_markup=main_menu_keyboard())
+            bot.send_message(order_id, (
+                f"✅ Жүргізуші табылды!\n\n"
+                f"Аты-жөні: {driver_info['name']}\n"
+                f"Тел: {driver_info['phone']}\n"
+                f"Көлік: {driver_info['car']}\n"
+                f"Нөмірі: {driver_info['number']}"
+            ), reply_markup=main_menu_keyboard())
 
-        # Жүргізушіге клиент дерегі
-        bot.send_message(driver_id, (
-            f"🚖 Сіз клиентті алдыңыз!\n\n"
-            f"Аты: {client_info['name']}\n"
-            f"Телефон: {client_info['phone']}\n"
-            f"Алып кету: {client_info['from']}\n"
-            f"Баратын жері: {client_info['to']}\n"
-            f"Уақыты: {client_info['time']}"
-        ))
+            bot.send_message(driver_id, (
+                f"🚖 Сіз клиентті алдыңыз!\n\n"
+                f"Аты: {client_info['name']}\n"
+                f"Тел: {client_info['phone']}\n"
+                f"Алып кету: {client_info['from']}\n"
+                f"Бару: {client_info['to']}\n"
+                f"Уақыты: {client_info['time']}"
+            ))
 
-        # Кнопкаларды алып тастау
-        bot.edit_message_reply_markup(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            reply_markup=None
-        )
+            bot.edit_message_reply_markup(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=None
+            )
 
         bot.answer_callback_query(call.id, "Сіз тапсырысты қабылдадыңыз.")
     elif call.data == "ignore":
         bot.answer_callback_query(call.id, "Рақмет, қабылдамадыңыз.")
 
-# 🚖 Серіктес болу (тіркелу)
-@bot.message_handler(func=lambda m: m.text == "Серіктес болу")
+# 🚗 Серіктес тіркеу
+@bot.message_handler(func=lambda msg: msg.text == "Серіктес болу")
 def driver_register(msg):
-    bot.send_message(msg.chat.id, "Атыңыз кім?", reply_markup=main_menu_keyboard())
+    cid = msg.chat.id
+    user_data[cid] = {}
+    user_state[cid] = "reg_name"
+    bot.send_message(cid, "Атыңызды жазыңыз:", reply_markup=main_menu_keyboard())
     bot.register_next_step_handler(msg, ask_driver_phone)
 
 def ask_driver_phone(msg):
-    user_data[msg.chat.id] = {'name': msg.text}
-    bot.send_message(msg.chat.id, "Телефон нөміріңіз:", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, ask_driver_car_number)
+    cid = msg.chat.id
+    if user_state.get(cid) != "reg_name":
+        return start(msg)
+    user_data[cid]['name'] = msg.text
+    user_state[cid] = "reg_phone"
+    bot.send_message(cid, "Телефон нөміріңіз:", reply_markup=main_menu_keyboard())
+    bot.register_next_step_handler(msg, ask_driver_number)
 
-def ask_driver_car_number(msg):
-    user_data[msg.chat.id]['phone'] = msg.text
-    bot.send_message(msg.chat.id, "Көлік номеріңіз:", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, ask_driver_car_model)
+def ask_driver_number(msg):
+    cid = msg.chat.id
+    if user_state.get(cid) != "reg_phone":
+        return start(msg)
+    user_data[cid]['phone'] = msg.text
+    user_state[cid] = "reg_number"
+    bot.send_message(cid, "Көлік номеріңіз:", reply_markup=main_menu_keyboard())
+    bot.register_next_step_handler(msg, ask_driver_car)
 
-def ask_driver_car_model(msg):
-    user_data[msg.chat.id]['number'] = msg.text
-    bot.send_message(msg.chat.id, "Көлік маркасы:", reply_markup=main_menu_keyboard())
-    bot.register_next_step_handler(msg, finish_driver_register)
+def ask_driver_car(msg):
+    cid = msg.chat.id
+    if user_state.get(cid) != "reg_number":
+        return start(msg)
+    user_data[cid]['number'] = msg.text
+    user_state[cid] = "reg_car"
+    bot.send_message(cid, "Көлік маркасы:", reply_markup=main_menu_keyboard())
+    bot.register_next_step_handler(msg, finish_driver_registration)
 
-def finish_driver_register(msg):
-    data = user_data[msg.chat.id]
-    data['car'] = msg.text
+def finish_driver_registration(msg):
+    cid = msg.chat.id
+    if user_state.get(cid) != "reg_car":
+        return start(msg)
+    user_data[cid]['car'] = msg.text
+    user_state[cid] = None
+
+    data = user_data[cid]
     drivers_ws.append_row([
-        str(msg.chat.id),
+        str(cid),
         data['name'],
         data['phone'],
         data['number'],
         data['car']
     ])
-    bot.send_message(msg.chat.id, "🎉 Сіз жүргізуші ретінде тіркелдіңіз!", reply_markup=main_menu_keyboard())
 
-# 🔍 Жүргізушіні ID арқылы табу
+    bot.send_message(cid,
+        "🎉 Сіз жүргізуші ретінде тіркелдіңіз!\n"
+        "Енді @kasymbekoffnr аккаунтына жазыңыз — сізді топқа қосу үшін.",
+        reply_markup=main_menu_keyboard()
+    )
+
+# 📞 Қолдау
+@bot.message_handler(func=lambda msg: msg.text == "📞 Қолдау қызметі")
+def support(msg):
+    bot.send_message(msg.chat.id, "📞 Қолдау: @kasymbekoffnr", reply_markup=main_menu_keyboard())
+
+# 🔍 Жүргізуші ID арқылы
 def get_driver_by_id(tid):
     all_data = drivers_ws.get_all_records()
     for row in all_data:
@@ -205,5 +242,5 @@ def get_driver_by_id(tid):
             }
     return None
 
-# 🔁 Ботты іске қосу
+# 🔁 Іске қосу
 bot.infinity_polling()
