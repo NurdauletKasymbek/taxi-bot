@@ -34,6 +34,7 @@ def start(msg):
 @bot.message_handler(func=lambda msg: msg.text == "Такси шақыру")
 def handle_taxi_start(msg):
     cid = msg.chat.id
+    bot.clear_step_handler_by_chat_id(cid)  # 🛑 Ескі handler-ді өшіру
     user_data[cid] = {}
     user_state[cid] = "waiting_name"
     bot.send_message(cid, "Атыңызды енгізіңіз:", reply_markup=main_menu_keyboard())
@@ -119,7 +120,7 @@ def handle_time(msg):
 @bot.message_handler(func=lambda msg: msg.text == "📞 Қолдау қызметі")
 def support(msg):
     cid = msg.chat.id
-    bot.clear_step_handler_by_chat_id(cid)  # ✅ Бұрынғы step handler-ді тоқтату
+    bot.clear_step_handler_by_chat_id(cid)  # ✅ Барлық step-терді өшіру
     user_state[cid] = None
     user_data[cid] = {}
     bot.send_message(cid, "📞 Қолдау қызметі: @kasymbekoffnr", reply_markup=main_menu_keyboard())
@@ -184,6 +185,7 @@ def handle_callbacks(call):
 @bot.message_handler(func=lambda msg: msg.text == "Серіктес болу")
 def driver_register(msg):
     cid = msg.chat.id
+    bot.clear_step_handler_by_chat_id(cid)  # ✅ Бұрынғы қадамдарды тоқтату
     user_data[cid] = {}
     user_state[cid] = "reg_name"
     bot.send_message(cid, "Атыңызды жазыңыз:", reply_markup=main_menu_keyboard())
