@@ -90,8 +90,9 @@ def handle_time(msg):
         return support(msg)
     if user_state.get(cid) != "waiting_time":
         return start(msg)
+
     user_data[cid]['time'] = msg.text
-    user_state[cid] = None
+    user_state[cid] = None  # ✅ Статус тоқтайды
 
     order_id = cid
     pending_requests[order_id] = {"accepted": False}
@@ -116,6 +117,11 @@ def handle_time(msg):
     pending_requests[order_id]["message_id"] = sent.message_id
 
     bot.send_message(cid, "🚗 Жүргізуші іздестірілуде...", reply_markup=main_menu_keyboard())
+
+    # ✅ Қадамдарды тазартып жіберу (сақтандыру үшін)
+    bot.clear_step_handler_by_chat_id(cid)
+    user_data[cid] = {}
+
 
 @bot.message_handler(func=lambda msg: msg.text == "📞 Қолдау қызметі")
 def support(msg):
