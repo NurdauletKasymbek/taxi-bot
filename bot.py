@@ -14,12 +14,10 @@ sheet = client.open_by_key(SHEET_ID)
 drivers_ws = sheet.worksheet(DRIVERS_SHEET)
 requests_ws = sheet.worksheet(REQUESTS_SHEET)
 
-# Global states
 user_state = {}
 user_data = {}
 pending_requests = {}
 
-# Командалық батырмалар тізімі
 COMMAND_BUTTONS = ["Такси шақыру", "Серіктес болу", "📞 Қолдау қызметі"]
 
 def main_menu_keyboard():
@@ -45,6 +43,8 @@ def handle_taxi_start(msg):
 
 def handle_name(msg):
     cid = msg.chat.id
+    if msg.text == "📞 Қолдау қызметі":
+        return support(msg)
     if msg.text in COMMAND_BUTTONS:
         return handle_taxi_start(msg)
     if user_state.get(cid) != "waiting_name":
@@ -56,6 +56,8 @@ def handle_name(msg):
 
 def handle_phone(msg):
     cid = msg.chat.id
+    if msg.text == "📞 Қолдау қызметі":
+        return support(msg)
     if msg.text in COMMAND_BUTTONS:
         return handle_taxi_start(msg)
     if user_state.get(cid) != "waiting_phone":
@@ -67,6 +69,8 @@ def handle_phone(msg):
 
 def handle_from(msg):
     cid = msg.chat.id
+    if msg.text == "📞 Қолдау қызметі":
+        return support(msg)
     if msg.text in COMMAND_BUTTONS:
         return handle_taxi_start(msg)
     if user_state.get(cid) != "waiting_from":
@@ -78,6 +82,8 @@ def handle_from(msg):
 
 def handle_to(msg):
     cid = msg.chat.id
+    if msg.text == "📞 Қолдау қызметі":
+        return support(msg)
     if msg.text in COMMAND_BUTTONS:
         return handle_taxi_start(msg)
     if user_state.get(cid) != "waiting_to":
@@ -89,6 +95,8 @@ def handle_to(msg):
 
 def handle_time(msg):
     cid = msg.chat.id
+    if msg.text == "📞 Қолдау қызметі":
+        return support(msg)
     if msg.text in COMMAND_BUTTONS:
         return handle_taxi_start(msg)
     if user_state.get(cid) != "waiting_time":
@@ -120,7 +128,6 @@ def handle_time(msg):
 
     bot.send_message(cid, "🚗 Жүргізуші іздестірілуде...", reply_markup=main_menu_keyboard())
 
-# Callback – қабылдау
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
     if call.data.startswith("accept_"):
@@ -171,7 +178,6 @@ def handle_callbacks(call):
     elif call.data == "ignore":
         bot.answer_callback_query(call.id, "Рақмет, қабылдамадыңыз.")
 
-# Серіктес болу
 @bot.message_handler(func=lambda msg: msg.text == "Серіктес болу")
 def driver_register(msg):
     cid = msg.chat.id
@@ -182,6 +188,8 @@ def driver_register(msg):
 
 def ask_driver_phone(msg):
     cid = msg.chat.id
+    if msg.text == "📞 Қолдау қызметі":
+        return support(msg)
     if msg.text in COMMAND_BUTTONS:
         return driver_register(msg)
     if user_state.get(cid) != "reg_name":
@@ -193,6 +201,8 @@ def ask_driver_phone(msg):
 
 def ask_driver_number(msg):
     cid = msg.chat.id
+    if msg.text == "📞 Қолдау қызметі":
+        return support(msg)
     if msg.text in COMMAND_BUTTONS:
         return driver_register(msg)
     if user_state.get(cid) != "reg_phone":
@@ -204,6 +214,8 @@ def ask_driver_number(msg):
 
 def ask_driver_car(msg):
     cid = msg.chat.id
+    if msg.text == "📞 Қолдау қызметі":
+        return support(msg)
     if msg.text in COMMAND_BUTTONS:
         return driver_register(msg)
     if user_state.get(cid) != "reg_number":
@@ -215,6 +227,8 @@ def ask_driver_car(msg):
 
 def finish_driver_registration(msg):
     cid = msg.chat.id
+    if msg.text == "📞 Қолдау қызметі":
+        return support(msg)
     if msg.text in COMMAND_BUTTONS:
         return driver_register(msg)
     if user_state.get(cid) != "reg_car":
@@ -235,12 +249,21 @@ def finish_driver_registration(msg):
         reply_markup=main_menu_keyboard()
     )
 
-# Қолдау
-@bot.message_handler(func=lambda msg: msg.text == "📞 Қолдау қызметі")
 def support(msg):
-    bot.send_message(msg.chat.id, "📞 Қолдау: @kasymbekoffnr", reply_markup=main_menu_keyboard())
+    cid = msg.chat.id
+    username = msg.from_user.username or "жоқ"
+    name = msg.from_user.first_name or "Анық емес"
+    text = (
+        "🆘 Қолдау қызметі сұралды\n"
+        f"👤 Username: @{username}\n"
+        f"🧾 Аты: {name}\n"
+        f"🆔 Telegram ID: {cid}"
+    )
+    bot.send_message(cid, "📞 Қолдау қызметі: @kasymbekoffnr", reply_markup=main_menu_keyboard())
+    bot.send_message(DRIVER_GROUP_ID, text)
+    user_state[cid] = None
+    user_data[cid] = {}
 
-# ID арқылы жүргізуші іздеу
 def get_driver_by_id(tid):
     all_data = drivers_ws.get_all_records()
     for row in all_data:
