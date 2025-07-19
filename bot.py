@@ -9,9 +9,11 @@ bot = telebot.TeleBot(BOT_TOKEN)
 # 🧩 Тұрақты клавиатура
 def main_menu_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("Такси шақыру", "Серіктес болу")
+    markup.row("Такси шақыру", "Серіктес болу")
+    markup.add("📞 Қолдау қызметі")
     return markup
 
+# 📊 Google Sheets орнату
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("/etc/secrets/creds.json", scope)
 client = gspread.authorize(creds)
@@ -22,10 +24,12 @@ requests_ws = sheet.worksheet(REQUESTS_SHEET)
 user_data = {}
 pending_requests = {}
 
+# 🔘 Start командасы
 @bot.message_handler(commands=['start'])
 def start(msg):
     bot.send_message(msg.chat.id, "Қош келдіңіз! Қызмет түрін таңдаңыз:", reply_markup=main_menu_keyboard())
 
+# 🚕 Такси шақыру
 @bot.message_handler(func=lambda m: m.text == "Такси шақыру")
 def taxi_request(msg):
     user_data[msg.chat.id] = {}
@@ -77,11 +81,22 @@ def confirm_order(msg):
 
     bot.send_message(order_id, "🚗 Жүргізуші іздестірілуде...", reply_markup=main_menu_keyboard())
 
+# ❌ Бас тарту хэндлері
 @bot.message_handler(func=lambda m: "бас тарту" in m.text.lower())
 def cancel_order(msg):
     user_data.pop(msg.chat.id, None)
     bot.send_message(msg.chat.id, "❌ Тапсырысыңыз жойылды.", reply_markup=main_menu_keyboard())
 
+# 📞 Қолдау қызметі батырмасы
+@bot.message_handler(func=lambda m: m.text == "📞 Қолдау қызметі")
+def support_handler(msg):
+    bot.send_message(
+        msg.chat.id,
+        "📞 Қолдау қызметі: @kasymbekoffnr\nКез келген сұрақтар бойынша осы аккаунтқа хабарласыңыз.",
+        reply_markup=main_menu_keyboard()
+    )
+
+# ✅ Жүргізушінің қабылдауы
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
     if call.data.startswith("accept_"):
@@ -144,6 +159,7 @@ def handle_callbacks(call):
     elif call.data == "ignore":
         bot.answer_callback_query(call.id, "Рақмет, қабылдамадыңыз.")
 
+# 🚖 Серіктес болу (тіркелу)
 @bot.message_handler(func=lambda m: m.text == "Серіктес болу")
 def driver_register(msg):
     bot.send_message(msg.chat.id, "Атыңыз кім?", reply_markup=main_menu_keyboard())
@@ -176,6 +192,7 @@ def finish_driver_register(msg):
     ])
     bot.send_message(msg.chat.id, "🎉 Сіз жүргізуші ретінде тіркелдіңіз!", reply_markup=main_menu_keyboard())
 
+# 🔍 Жүргізушіні ID арқылы табу
 def get_driver_by_id(tid):
     all_data = drivers_ws.get_all_records()
     for row in all_data:
@@ -188,4 +205,5 @@ def get_driver_by_id(tid):
             }
     return None
 
+# 🔁 Ботты іске қосу
 bot.infinity_polling()
