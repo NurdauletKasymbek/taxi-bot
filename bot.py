@@ -98,7 +98,10 @@ def handle_time(msg):
     cid = msg.chat.id
     user_data[cid]['time'] = msg.text
     order_id = cid
-    pending_requests[order_id] = {"accepted": False}
+    pending_requests[order_id] = {
+        "accepted": False,
+        "client_info": user_data[cid]  # Клиент деректерін сақтап қойдық
+    }
 
     markup = types.InlineKeyboardMarkup()
     markup.add(
@@ -118,9 +121,11 @@ def handle_time(msg):
 
     sent = bot.send_message(DRIVER_GROUP_ID, order_text, reply_markup=markup)
     pending_requests[order_id]["message_id"] = sent.message_id
+    pending_requests[order_id]["chat_id"] = sent.chat.id  # Қай топқа жіберілгенін сақтау
 
     bot.send_message(cid, "🚗 Жүргізуші іздестірілуде...", reply_markup=main_menu_keyboard())
     reset_user(cid)
+
 
 # ---------------- Серіктес болу ------------------
 
@@ -200,6 +205,7 @@ def get_driver_by_id(tid):
 def handle_callbacks(call):
     if call.data.startswith("accept_"):
         order_id = int(call.data.split("_")[1])
+
         if pending_requests.get(order_id, {}).get("accepted"):
             return bot.answer_callback_query(call.id, "Бұл тапсырыс қабылданған.")
 
@@ -208,11 +214,13 @@ def handle_callbacks(call):
         if not driver_info:
             return bot.answer_callback_query(call.id, "Сіз тіркелмегенсіз.")
 
+        # Тапсырысты бекіту
         pending_requests[order_id]["accepted"] = True
         pending_requests[order_id]["driver_id"] = driver_id
 
-        client_info = user_data.get(order_id)
+        client_info = pending_requests[order_id].get("client_info")
         if client_info:
+            # Sheets-ке жазу
             requests_ws.append_row([
                 str(order_id),
                 client_info['name'],
@@ -226,6 +234,7 @@ def handle_callbacks(call):
                 driver_info['car']
             ])
 
+            # Клиентке жүргізуші дерегін жіберу
             bot.send_message(order_id, (
                 f"✅ Жүргізуші табылды!\n\n"
                 f"Аты-жөні: {driver_info['name']}\n"
@@ -234,6 +243,7 @@ def handle_callbacks(call):
                 f"Нөмірі: {driver_info['number']}"
             ), reply_markup=main_menu_keyboard())
 
+            # Жүргізушіге клиент дерегін жіберу
             bot.send_message(driver_id, (
                 f"🚖 Сіз клиентті алдыңыз!\n\n"
                 f"Аты: {client_info['name']}\n"
@@ -243,14 +253,19 @@ def handle_callbacks(call):
                 f"Уақыты: {client_info['time']}"
             ))
 
-            bot.edit_message_reply_markup(
-                chat_id=call.message.chat.id,
-                message_id=call.message.message_id,
-                reply_markup=None
-            )
+            # Чаттан тапсырыс хабарламасын жою
+            try:
+                bot.delete_message(
+                    chat_id=pending_requests[order_id]["chat_id"],
+                    message_id=pending_requests[order_id]["message_id"]
+                )
+            except:
+                pass
 
         bot.answer_callback_query(call.id, "Сіз тапсырысты қабылдадыңыз.")
+
     elif call.data == "ignore":
         bot.answer_callback_query(call.id, "Рақмет, қабылдамадыңыз.")
+
 
 bot.infinity_polling()
